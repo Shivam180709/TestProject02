@@ -1,0 +1,356 @@
+import React, { useState, useEffect } from 'react';
+import { AlertLevel, ShipState } from '../types/simulation';
+import { soundEffects } from '../audio/soundEffects';
+import { computerVoice } from '../audio/computerVoice';
+import { Shield, AlertTriangle, Volume2, VolumeX, Eye, HelpCircle, Radio, Crosshair, Music, Sliders, Bot, Dna } from 'lucide-react';
+
+interface LCARSHeaderProps {
+  shipState: ShipState | null;
+  onSetAlert: (level: AlertLevel) => void;
+  onToggleInspection: () => void;
+  onToggleScanner: () => void;
+  onToggleHelp: () => void;
+  onToggleLog?: () => void;
+  onToggleTacticalScanner?: () => void;
+  onToggleBattleTheme?: () => void;
+  onOpenBattleThemeSettings?: () => void;
+  onOpenVoiceSettings?: () => void;
+  onGoToNearestSpaceDock?: () => void;
+  onToggleComputerVoice?: () => void;
+  onToggleSpeciesDb?: () => void;
+  isComputerVoiceEnabled?: boolean;
+  isInspectionOpen: boolean;
+  isScannerOpen: boolean;
+  isLogOpen?: boolean;
+  isTacticalScannerOpen?: boolean;
+  isBattleThemePlaying?: boolean;
+  isSpeciesDbOpen?: boolean;
+  logCount?: number;
+}
+
+export const LCARSHeader: React.FC<LCARSHeaderProps> = ({
+  shipState,
+  onSetAlert,
+  onToggleInspection,
+  onToggleScanner,
+  onToggleHelp,
+  onToggleLog,
+  onToggleTacticalScanner,
+  onToggleBattleTheme,
+  onOpenBattleThemeSettings,
+  onOpenVoiceSettings,
+  onGoToNearestSpaceDock,
+  onToggleComputerVoice,
+  onToggleSpeciesDb,
+  isComputerVoiceEnabled = true,
+  isInspectionOpen,
+  isScannerOpen,
+  isLogOpen,
+  isTacticalScannerOpen = true,
+  isBattleThemePlaying = false,
+  isSpeciesDbOpen = false,
+  logCount,
+}) => {
+  const [stardate, setStardate] = useState('7412.4');
+  const [isMuted, setIsMuted] = useState(soundEffects.getMuted());
+
+  useEffect(() => {
+    // Generate authentic Trek stardate based on real time
+    const updateStardate = () => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const startOfYear = new Date(year, 0, 1).getTime();
+      const fraction = (now.getTime() - startOfYear) / (365.25 * 24 * 3600 * 1000);
+      const sd = ((year - 2000) * 100 + fraction * 1000).toFixed(1);
+      setStardate(sd);
+    };
+    updateStardate();
+    const interval = setInterval(updateStardate, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const toggleSound = () => {
+    const nextMuted = !isMuted;
+    soundEffects.setMuted(nextMuted);
+    setIsMuted(nextMuted);
+    if (!nextMuted) {
+      soundEffects.playLcarsBeep(880, 0.05);
+    }
+  };
+
+  const alertLevel = shipState?.alertLevel || 'green';
+
+  return (
+    <header className="relative z-20 h-14 sm:h-16 flex items-center justify-between px-3 sm:px-4 bg-slate-950/90 backdrop-blur-md border-b border-amber-500/30 text-slate-100 select-none">
+      {/* Zone 1: Starfleet Flagship Brand */}
+      <div className="flex items-center gap-3">
+        {/* LCARS Elbow Accent */}
+        <div className="hidden sm:flex items-center">
+          <div className="w-10 h-7 rounded-tl-xl bg-amber-500 flex items-center justify-center text-slate-950 font-trek font-bold text-xs">
+            1701
+          </div>
+          <div className="w-3 h-7 bg-amber-400 border-l border-slate-950" />
+        </div>
+
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="font-trek font-bold text-base tracking-wider text-amber-400 uppercase">
+              USS Enterprise
+            </h1>
+            <span className="text-xs font-mono-nums text-slate-400">NCC-1701</span>
+          </div>
+          <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
+            <span>Constitution Class Refit</span>
+            <span aria-hidden="true">·</span>
+            <span>Stardate {stardate}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Zone 2: Ship Tactical Status & Alert Level Selector */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        {/* Alert Level Segmented Controls */}
+        <div className="flex items-center bg-slate-900 border border-slate-800 rounded-md p-0.5" title="Alert Status [G key to cycle]">
+          <button
+            onClick={() => onSetAlert('green')}
+            className={`px-2.5 py-1 text-xs font-trek uppercase rounded transition-colors ${
+              alertLevel === 'green'
+                ? 'bg-emerald-600 text-white font-semibold shadow-sm'
+                : 'text-slate-400 hover:text-emerald-400'
+            }`}
+            title="Condition Green - Standard Cruise [G key to cycle]"
+          >
+            Green
+          </button>
+          <button
+            onClick={() => onSetAlert('yellow')}
+            className={`px-2.5 py-1 text-xs font-trek uppercase rounded transition-colors ${
+              alertLevel === 'yellow'
+                ? 'bg-amber-500 text-slate-950 font-semibold shadow-sm'
+                : 'text-slate-400 hover:text-amber-400'
+            }`}
+            title="Condition Yellow - Standby Alert [G key to cycle]"
+          >
+            Yellow
+          </button>
+          <button
+            onClick={() => onSetAlert('red')}
+            className={`px-2.5 py-1 text-xs font-trek uppercase rounded transition-colors flex items-center gap-1 ${
+              alertLevel === 'red'
+                ? 'bg-red-600 text-white font-semibold animate-pulse shadow-sm shadow-red-500/50'
+                : 'text-slate-400 hover:text-red-400'
+            }`}
+            title="Condition Red - Battle Stations! [G key to cycle]"
+          >
+            <AlertTriangle className="w-3 h-3" />
+            Red
+          </button>
+          <span className="hidden lg:inline text-[9px] text-slate-500 font-mono-nums px-1.5 font-bold" title="Press G key on keyboard to cycle alert status">
+            [G]
+          </span>
+        </div>
+
+        {/* Quick telemetry indicators */}
+        <div className="hidden md:flex items-center gap-3 text-xs font-mono-nums px-3 py-1 bg-slate-900/80 rounded border border-slate-800">
+          <div className="flex items-center gap-1.5">
+            <Shield className="w-3.5 h-3.5 text-sky-400" />
+            <span className="text-slate-400">Shields:</span>
+            <span className={shipState?.shieldsRaised ? 'text-sky-300 font-semibold' : 'text-slate-500'}>
+              {shipState?.shieldsRaised ? `${shipState?.shieldIntegrity}%` : 'DOWN'}
+            </span>
+          </div>
+          <span className="text-slate-700">|</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-400">Hull:</span>
+            <span className="text-emerald-400 font-semibold">{shipState?.hullIntegrity}%</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Zone 3: Modal Actions & Sound Controls */}
+      <div className="flex items-center gap-2">
+        {/* Long Range Planetary & Celestial Sensors */}
+        <button
+          onClick={onToggleScanner}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors border ${
+            isScannerOpen
+              ? 'bg-amber-500 text-slate-950 font-bold border-amber-400 shadow-sm shadow-amber-500/30'
+              : 'bg-amber-500/15 text-amber-300 border-amber-500/40 hover:bg-amber-500/25'
+          }`}
+          title="Long Range Planetary & Subspace Sensors"
+        >
+          <Radio className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline font-trek uppercase tracking-wide">Sensors</span>
+        </button>
+
+        {/* Tactical Combat Radar Toggle */}
+        {onToggleTacticalScanner && (
+          <button
+            onClick={onToggleTacticalScanner}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors border ${
+              isTacticalScannerOpen
+                ? 'bg-sky-500 text-slate-950 font-bold border-sky-400 shadow-sm shadow-sky-500/30'
+                : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:bg-slate-800'
+            }`}
+            title="Toggle 360° Tactical Combat Radar [R]"
+          >
+            <Crosshair className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline font-trek uppercase tracking-wide">Radar [R]</span>
+          </button>
+        )}
+
+        {/* Complete Ship Inspection */}
+        <button
+          onClick={onToggleInspection}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors border ${
+            isInspectionOpen
+              ? 'bg-amber-500 text-slate-950 font-semibold border-amber-400 shadow-sm shadow-amber-500/30'
+              : 'bg-amber-500/15 text-amber-300 border-amber-500/40 hover:bg-amber-500/25'
+          }`}
+          title="Ship Inspection: Decks & Subsystems"
+        >
+          <Eye className="w-3.5 h-3.5" />
+          <span className="font-trek uppercase tracking-wide">Inspect Ship</span>
+        </button>
+
+        {/* Star Trek Alien Species Database [X] */}
+        {onToggleSpeciesDb && (
+          <button
+            onClick={onToggleSpeciesDb}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors border ${
+              isSpeciesDbOpen
+                ? 'bg-amber-500 text-slate-950 font-bold border-amber-400 shadow-sm shadow-amber-500/30'
+                : 'bg-amber-500/15 text-amber-300 border-amber-500/40 hover:bg-amber-500/25'
+            }`}
+            title="Star Trek Exobiology & Alien Species Database [X]"
+          >
+            <Dna className="w-3.5 h-3.5 text-amber-400" />
+            <span className="font-trek uppercase tracking-wide">Species DB</span>
+            <span className="hidden xl:inline text-[9px] font-mono text-amber-400/80 font-bold">[X]</span>
+          </button>
+        )}
+
+        {/* Tactical Combat Log Console */}
+        {onToggleLog && (
+          <button
+            onClick={onToggleLog}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors border ${
+              isLogOpen
+                ? 'bg-amber-500 text-slate-950 font-bold border-amber-400 shadow-sm shadow-amber-500/30'
+                : 'bg-amber-500/15 text-amber-300 border-amber-500/40 hover:bg-amber-500/25'
+            }`}
+            title="Tactical Combat Telemetry Log Console"
+          >
+            <Radio className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+            <span className="font-trek uppercase tracking-wide">Tactical Log</span>
+            {logCount && logCount > 0 ? (
+              <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[10px] font-bold font-mono">
+                {logCount}
+              </span>
+            ) : null}
+          </button>
+        )}
+
+        {/* Battle Theme Soundtrack Quick Toggle [B] */}
+        {onToggleBattleTheme && (
+          <div className="flex items-center bg-slate-900 border border-slate-800 rounded overflow-hidden">
+            <button
+              onClick={onToggleBattleTheme}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                isBattleThemePlaying
+                  ? 'bg-amber-500 text-slate-950 font-bold shadow-sm shadow-amber-500/50 animate-pulse'
+                  : 'text-amber-300 hover:bg-slate-800'
+              }`}
+              title="Star Trek Theme Song (Loop) - Press [B] to Turn ON / OFF"
+            >
+              <Music className={`w-3.5 h-3.5 ${isBattleThemePlaying ? 'animate-bounce text-slate-950' : 'text-amber-400'}`} />
+              <span className="hidden md:inline font-trek uppercase tracking-wide">
+                {isBattleThemePlaying ? 'Theme: ON [B]' : 'Theme: OFF [B]'}
+              </span>
+            </button>
+            {onOpenBattleThemeSettings && (
+              <button
+                onClick={onOpenBattleThemeSettings}
+                className="px-2 py-1.5 text-slate-400 hover:text-amber-300 border-l border-slate-800 hover:bg-slate-800 transition-colors"
+                title="Combat Theme Soundtrack Audio Settings Console"
+              >
+                <Sliders className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Ship Computer Voice Toggle & Test Console [V] */}
+        {onToggleComputerVoice && (
+          <div className="flex items-center bg-slate-900 border border-slate-800 rounded overflow-hidden">
+            <button
+              onClick={onToggleComputerVoice}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                isComputerVoiceEnabled
+                  ? 'bg-sky-500/20 text-sky-300'
+                  : 'text-slate-500 hover:text-slate-400'
+              }`}
+              title={
+                isComputerVoiceEnabled
+                  ? "Ship Computer: USS Enterprise Tactical Voice [Press V to Mute]"
+                  : "Ship Computer: USS Enterprise Tactical Voice [Press V to Enable]"
+              }
+            >
+              <Bot className={`w-3.5 h-3.5 ${isComputerVoiceEnabled ? 'text-sky-400' : 'text-slate-500'}`} />
+              <span className="hidden md:inline font-trek uppercase tracking-wide">
+                {isComputerVoiceEnabled ? 'Enterprise [V]' : 'Voice: OFF [V]'}
+              </span>
+            </button>
+            {isComputerVoiceEnabled && (
+              <>
+                <button
+                  onClick={() => {
+                    soundEffects.setMuted(false);
+                    const ctx = soundEffects.getAudioContext();
+                    if (ctx && ctx.state === 'suspended') {
+                      ctx.resume().catch(() => {});
+                    }
+                    computerVoice.testVoice();
+                  }}
+                  className="px-2 py-1.5 text-[10px] font-trek uppercase tracking-wider text-sky-400 hover:text-white hover:bg-sky-500/30 border-l border-slate-800 transition-colors font-bold cursor-pointer"
+                  title="Test USS Enterprise Computer Voice Audio Now"
+                >
+                  Test Voice
+                </button>
+                {onOpenVoiceSettings && (
+                  <button
+                    onClick={onOpenVoiceSettings}
+                    className="px-2 py-1.5 text-slate-400 hover:text-sky-300 border-l border-slate-800 hover:bg-slate-800 transition-colors"
+                    title="LCARS Voice Telemetry & Starfleet MP3 Soundbank Settings"
+                  >
+                    <Sliders className="w-3 h-3" />
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Audio Mute Toggle */}
+        <button
+          onClick={toggleSound}
+          className="p-1.5 bg-slate-900 border border-slate-800 rounded text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+          title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+          aria-label={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+        >
+          {isMuted ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
+        </button>
+
+        {/* Help & Controls Keymap */}
+        <button
+          onClick={onToggleHelp}
+          className="p-1.5 bg-slate-900 border border-slate-800 rounded text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+          title="Flight Manual & Keyboard Shortcuts"
+          aria-label="Help"
+        >
+          <HelpCircle className="w-4 h-4 text-amber-400" />
+        </button>
+      </div>
+    </header>
+  );
+};
