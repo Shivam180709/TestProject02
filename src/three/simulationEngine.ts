@@ -77,6 +77,8 @@ export class SimulationEngine {
 
   // Tactical & Health Damage System
   private alertLevel: AlertLevel = 'green';
+  private gPressTimer: number | null = null;
+  private lastGPressTime: number = 0;
   private shieldsRaised: boolean = true;
   private shieldIntegrity: number = 100;
   private hullIntegrity: number = 100;
@@ -184,6 +186,7 @@ export class SimulationEngine {
 
     // Start background sound
     soundEffects.startImpulseHum();
+    soundEffects.stopRedAlert();
 
     // 4. Start Render Loop
     this.animate = this.animate.bind(this);
@@ -208,6 +211,11 @@ export class SimulationEngine {
     if (this.animFrameId !== null) {
       cancelAnimationFrame(this.animFrameId);
     }
+    if (this.gPressTimer !== null) {
+      clearTimeout(this.gPressTimer);
+      this.gPressTimer = null;
+    }
+    soundEffects.stopRedAlert();
     window.removeEventListener('resize', this.handleResize);
     window.removeEventListener('keydown', this.handleKeyDown);
     window.removeEventListener('keyup', this.handleKeyUp);
@@ -527,7 +535,14 @@ export class SimulationEngine {
   }
 
   public setAlertLevel(level: AlertLevel) {
-    if (this.alertLevel === level) return;
+    if (this.alertLevel === level) {
+      if (level === 'red') {
+        soundEffects.startRedAlert();
+      } else {
+        soundEffects.stopRedAlert();
+      }
+      return;
+    }
     this.alertLevel = level;
     computerVoice.onAlertStatusShift(level);
     if (level === 'red') {
@@ -543,25 +558,66 @@ export class SimulationEngine {
     this.broadcastState();
   }
 
-  // Cycles alert condition: Green -> Yellow -> Red -> Green [G key]
-  public cycleAlertLevel() {
-    let nextLevel: AlertLevel = 'green';
-    if (this.alertLevel === 'green') {
-      nextLevel = 'yellow';
-    } else if (this.alertLevel === 'yellow') {
-      nextLevel = 'red';
+  // G key or UI alert toggle: Single click -> Yellow Alert, Double click -> Red Alert
+  public handleGAlertAction() {
+    const now = performance.now();
+    const timeSinceLast = now - this.lastGPressTime;
+
+    if (this.lastGPressTime > 0 && timeSinceLast < 350) {
+      // Double click confirmed!
+      if (this.gPressTimer !== null) {
+        clearTimeout(this.gPressTimer);
+        this.gPressTimer = null;
+      }
+      this.lastGPressTime = 0;
+      this.setAlertLevel('red');
+      this.addLogEvent(
+        'DEFENSE',
+        'critical',
+        'Condition RED Engaged [Double-Tap G]',
+        'Battle stations! Multiphasic shields raised, tactical weapons systems hot.'
+      );
     } else {
-      nextLevel = 'green';
+      // First click: wait 280ms to check if a second click arrives
+      this.lastGPressTime = now;
+      if (this.gPressTimer !== null) {
+        clearTimeout(this.gPressTimer);
+      }
+      this.gPressTimer = window.setTimeout(() => {
+        this.gPressTimer = null;
+        // Single click confirmed:
+        // Switch to Yellow Alert (or stand down to Green if already in Yellow or Red)
+        if (this.alertLevel === 'yellow') {
+          this.setAlertLevel('green');
+          this.addLogEvent(
+            'DEFENSE',
+            'info',
+            'Condition GREEN Restored [Single-Tap G]',
+            'Stand down to standard cruising posture.'
+          );
+        } else if (this.alertLevel === 'red') {
+          this.setAlertLevel('green');
+          this.addLogEvent(
+            'DEFENSE',
+            'info',
+            'Condition GREEN Restored [Single-Tap G]',
+            'Battle stations cleared. Starship returned to Condition Green.'
+          );
+        } else {
+          this.setAlertLevel('yellow');
+          this.addLogEvent(
+            'DEFENSE',
+            'warning',
+            'Condition YELLOW Engaged [Single-Tap G]',
+            'Yellow Alert active. Defensive grid and warp core on standby.'
+          );
+        }
+      }, 280);
     }
-    this.setAlertLevel(nextLevel);
-    this.addLogEvent(
-      'DEFENSE',
-      nextLevel === 'red' ? 'critical' : (nextLevel === 'yellow' ? 'warning' : 'info'),
-      `Alert Status Set: Condition ${nextLevel.toUpperCase()}`,
-      nextLevel === 'red' ? 'Battle stations! Multiphasic shields raised, weapons armed.' :
-      nextLevel === 'yellow' ? 'Yellow alert. Defensive grid and warp core on standby.' :
-      'Condition Green. Standard exploration posture nominal.'
-    );
+  }
+
+  public cycleAlertLevel() {
+    this.handleGAlertAction();
   }
 
   // Camera POV Zoom In / Zoom Out methods
@@ -913,9 +969,21 @@ export class SimulationEngine {
     // Track combat telemetry for adaptive hostile scaling
     this.combatManager.adaptiveTracker.recordDamageTaken(effectiveAmount);
 
-    // Automatic red alert when taking unexpected fire
+    // Cancel any pending single-tap G timer when taking damage
+    if (this.gPressTimer !== null) {
+      clearTimeout(this.gPressTimer);
+      this.gPressTimer = null;
+    }
+
+    // Automatic red alert when taking unexpected fire / damage
     if (this.alertLevel !== 'red') {
       this.setAlertLevel('red');
+      this.addLogEvent(
+        'DEFENSE',
+        'critical',
+        'RED ALERT: IMPACT DETECTED',
+        'Enterprise taking combat damage. Automated battle stations protocol engaged.'
+      );
     }
 
     if (this.shieldsRaised && this.shieldIntegrity > 0) {
@@ -1686,12 +1754,26 @@ export class SimulationEngine {
         }
       }
 
-      // Smooth keyboard steering rates - tuned for responsive, engaging playability
-      const targetPitch = (this.keysPressed['w'] || this.keysPressed['arrowup'])
+      // Current pitch elevation: forwardVector.y > 0 is climbing, < 0 is diving
+      const currentPitchElevation = this.forwardVector.y; // -1 (down) to +1 (up)
+
+      let rawPitch = (this.keysPressed['w'] || this.keysPressed['arrowup'])
         ? -0.65
         : (this.keysPressed['s'] || this.keysPressed['arrowdown'])
         ? 0.65
         : 0;
+
+      // Clamping pitch limits: Maximum pitch is 65 degrees (elevation ±0.85).
+      // Prevents ship from looping or ever turning upside down!
+      if (rawPitch > 0 && currentPitchElevation > 0.78) {
+        // Approaching climb ceiling: smoothly damp pitch down to zero
+        const factor = Math.max(0, (0.85 - currentPitchElevation) / 0.07);
+        rawPitch *= factor;
+      } else if (rawPitch < 0 && currentPitchElevation < -0.78) {
+        // Approaching dive floor: smoothly damp pitch down to zero
+        const factor = Math.max(0, (currentPitchElevation - (-0.85)) / 0.07);
+        rawPitch *= factor;
+      }
 
       const targetYaw = (this.keysPressed['a'] || this.keysPressed['arrowleft'])
         ? 0.65
@@ -1703,15 +1785,20 @@ export class SimulationEngine {
 
       // Stable damping (enhanced agility during evasive thruster overdrive)
       const steerSpeed = this.isBoostActive ? 10.0 : 5.2;
-      this.pitchRate = THREE.MathUtils.lerp(this.pitchRate, targetPitch, delta * steerSpeed);
+      this.pitchRate = THREE.MathUtils.lerp(this.pitchRate, rawPitch, delta * steerSpeed);
       this.yawRate = THREE.MathUtils.lerp(this.yawRate, targetYaw, delta * steerSpeed);
       this.rollRate = THREE.MathUtils.lerp(this.rollRate, targetRoll, delta * steerSpeed);
 
-      // Flight assist auto-leveling
-      if (this.flightAssist && targetPitch === 0 && targetYaw === 0 && targetRoll === 0) {
-        this.pitchRate = THREE.MathUtils.lerp(this.pitchRate, 0, delta * 7);
-        this.yawRate = THREE.MathUtils.lerp(this.yawRate, 0, delta * 7);
-        this.rollRate = THREE.MathUtils.lerp(this.rollRate, 0, delta * 7);
+      // Flight assist auto-leveling (returns roll and pitch smoothly towards upright level flight)
+      if (this.flightAssist) {
+        if (rawPitch === 0 && !this.isWarping) {
+          // Gently restore pitch towards level horizon when user releases W/S
+          this.pitchRate = THREE.MathUtils.lerp(this.pitchRate, -currentPitchElevation * 0.6, delta * 3.5);
+        }
+        if (targetYaw === 0 && targetRoll === 0) {
+          this.rollRate = THREE.MathUtils.lerp(this.rollRate, 0, delta * 7);
+          this.yawRate = THREE.MathUtils.lerp(this.yawRate, 0, delta * 7);
+        }
       }
     }
 
@@ -1721,6 +1808,15 @@ export class SimulationEngine {
     deltaQuat.setFromEuler(rotEuler);
     this.orientation.multiply(deltaQuat);
     this.orientation.normalize();
+
+    // Prevent ship from inverting upside down: ensure upVector stays positive
+    const testUp = new THREE.Vector3(0, 1, 0).applyQuaternion(this.orientation);
+    if (testUp.y < 0.15) {
+      // Upright correction: pull roll and pitch back into the upright hemisphere
+      const uprightQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0, 'YXZ'));
+      this.orientation.slerp(uprightQuat, delta * 3.0);
+      this.orientation.normalize();
+    }
 
     // Update coordinate axes
     this.forwardVector.set(0, 0, -1).applyQuaternion(this.orientation);
@@ -1939,14 +2035,15 @@ export class SimulationEngine {
     const up = this.upVector;
     const right = this.rightVector;
 
-    const warpFovOffset = this.space.warpEffect?.getWarpFovOffset(this.warpFactor) || (this.isWarping ? 20 : 0);
-    const targetFov = 54 + warpFovOffset + (this.isBoostActive ? 11 : 0);
-    // For cockpit/bridge views, zooming adjusts the field of view smoothly
+    // Constant, stable camera FOV: No uneven warping distortion or angle shift across warp factors!
+    const targetFov = 54 + (this.isBoostActive ? 6 : 0);
     const effectiveFov = (this.viewMode === 'bridge' || this.viewMode === 'interior_bridge')
       ? THREE.MathUtils.clamp(targetFov * this.cameraZoom, 26, 92)
       : targetFov;
-    this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, effectiveFov, delta * (this.isBoostActive ? 4.5 : 3.5));
-    this.camera.updateProjectionMatrix();
+    if (Math.abs(this.camera.fov - effectiveFov) > 0.1) {
+      this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, effectiveFov, delta * 4.0);
+      this.camera.updateProjectionMatrix();
+    }
 
     switch (this.viewMode) {
       case 'interior_bridge': {
@@ -1965,12 +2062,14 @@ export class SimulationEngine {
       }
 
       case 'chase': {
-        // High-stability chase camera with smooth zoom in and out
+        // EXACT iconic camera view matching Warp 1.0 screenshot:
+        // Saucer in front with NCC-1701 clearly visible, bridge in center, nacelles on sides.
+        // Identical orientation and camera angle at ALL warp factors (W1 through W9.9)!
         const dist = 38 * this.cameraZoom;
         const height = 10.5 * Math.max(0.6, Math.sqrt(this.cameraZoom));
         const offset = forward.clone().multiplyScalar(-dist).add(up.clone().multiplyScalar(height));
         this.targetCameraPos.copy(shipPos).add(offset);
-        this.targetLookAt.copy(shipPos).add(forward.clone().multiplyScalar(25));
+        this.targetLookAt.copy(shipPos).add(forward.clone().multiplyScalar(22));
         break;
       }
 
@@ -2042,9 +2141,14 @@ export class SimulationEngine {
       this.targetCameraPos.y += shakeY;
     }
 
-    // Smooth stable camera dampening
-    const dampSpeed = this.viewMode === 'interior_bridge' ? 16 : 8.0;
-    this.camera.position.lerp(this.targetCameraPos, delta * dampSpeed);
+    // Camera positioning:
+    // When warping, camera stays rigidly locked to targetCameraPos to prevent any uneven lag or displacement
+    if (this.isWarping) {
+      this.camera.position.copy(this.targetCameraPos);
+    } else {
+      const dampSpeed = this.viewMode === 'interior_bridge' ? 16 : 8.5;
+      this.camera.position.lerp(this.targetCameraPos, delta * dampSpeed);
+    }
     this.camera.lookAt(this.targetLookAt);
 
     // Update 3D Positional Spatial Audio listener orientation & thruster sound

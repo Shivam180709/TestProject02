@@ -416,6 +416,8 @@ export function buildEnterpriseModel(): EnterpriseComponents {
   const root = new THREE.Group();
   root.name = 'USS_Enterprise_NCC1701';
 
+
+
   const subsystemNodes = new Map<string, THREE.Vector3>();
 
   const saucerDorsalTex = createSaucerDorsalTexture();

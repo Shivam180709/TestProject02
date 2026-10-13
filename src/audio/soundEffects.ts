@@ -21,6 +21,8 @@ class StarTrekSoundSystem {
   // Red alert loop
   private redAlertTimer: number | null = null;
   private isRedAlertPlaying: boolean = false;
+  private redAlertOsc: OscillatorNode | null = null;
+  private redAlertGain: GainNode | null = null;
 
   constructor() {
     // Initialized on user interaction
@@ -765,11 +767,30 @@ class StarTrekSoundSystem {
     if (this.isRedAlertPlaying || this.isMuted) return;
     this.initCtx();
     this.isRedAlertPlaying = true;
+    if (this.redAlertTimer !== null) {
+      clearTimeout(this.redAlertTimer);
+      this.redAlertTimer = null;
+    }
     this.loopRedAlertKlaxon();
   }
 
   private loopRedAlertKlaxon() {
     if (!this.isRedAlertPlaying || !this.ctx || this.isMuted) return;
+
+    // Clean up any lingering previous cycle nodes
+    if (this.redAlertGain && this.ctx) {
+      try {
+        this.redAlertGain.gain.setValueAtTime(0, this.ctx.currentTime);
+      } catch {}
+      this.redAlertGain = null;
+    }
+    if (this.redAlertOsc) {
+      try {
+        this.redAlertOsc.stop();
+        this.redAlertOsc.disconnect();
+      } catch {}
+      this.redAlertOsc = null;
+    }
 
     const t = this.ctx.currentTime;
     const cycleDur = 1.1;
@@ -792,11 +813,23 @@ class StarTrekSoundSystem {
     filter.connect(gain);
     gain.connect(this.ctx.destination);
 
+    this.redAlertOsc = osc;
+    this.redAlertGain = gain;
+
+    osc.onended = () => {
+      if (this.redAlertOsc === osc) {
+        this.redAlertOsc = null;
+      }
+    };
+
     osc.start(t);
     osc.stop(t + 0.6);
 
     this.redAlertTimer = window.setTimeout(() => {
-      this.loopRedAlertKlaxon();
+      this.redAlertTimer = null;
+      if (this.isRedAlertPlaying) {
+        this.loopRedAlertKlaxon();
+      }
     }, cycleDur * 1000);
   }
 
@@ -805,6 +838,20 @@ class StarTrekSoundSystem {
     if (this.redAlertTimer !== null) {
       clearTimeout(this.redAlertTimer);
       this.redAlertTimer = null;
+    }
+    if (this.redAlertGain && this.ctx) {
+      try {
+        this.redAlertGain.gain.cancelScheduledValues(this.ctx.currentTime);
+        this.redAlertGain.gain.setValueAtTime(0, this.ctx.currentTime);
+      } catch {}
+      this.redAlertGain = null;
+    }
+    if (this.redAlertOsc) {
+      try {
+        this.redAlertOsc.stop();
+        this.redAlertOsc.disconnect();
+      } catch {}
+      this.redAlertOsc = null;
     }
   }
 

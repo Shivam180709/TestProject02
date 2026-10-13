@@ -165,12 +165,16 @@ export const ControlsHelpModal: React.FC<ControlsHelpModalProps> = ({
                 <span className="text-emerald-300 font-semibold">Auto-Track ON / OFF</span>
               </div>
               <div className="flex items-center justify-between p-1.5 bg-slate-950/60 rounded">
-                <span className="text-slate-400">Cycle Alert Condition (Green/Yellow/Red)</span>
-                <span className="text-amber-300 font-semibold">G key</span>
+                <span className="text-slate-400">Condition Yellow (Standby)</span>
+                <span className="text-amber-300 font-semibold font-mono">Single Press G</span>
               </div>
               <div className="flex items-center justify-between p-1.5 bg-slate-950/60 rounded">
-                <span className="text-slate-400">Toggle Red Alert Klaxon</span>
-                <span className="text-red-300 font-semibold">Shift + R</span>
+                <span className="text-slate-400">Condition Red (Battle Stations)</span>
+                <span className="text-red-400 font-semibold font-mono">Double Press G</span>
+              </div>
+              <div className="flex items-center justify-between p-1.5 bg-slate-950/60 rounded">
+                <span className="text-slate-400">Combat Damage Response</span>
+                <span className="text-red-300 font-semibold">Auto-Engages Red Alert</span>
               </div>
             </div>
           </div>

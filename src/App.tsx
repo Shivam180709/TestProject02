@@ -29,6 +29,7 @@ import { LCARSBattleThemeWidget } from './components/LCARSBattleThemeWidget';
 import { LCARSVoiceSettingsModal } from './components/LCARSVoiceSettingsModal';
 import { LCARSObjectDetailModal } from './components/LCARSObjectDetailModal';
 import { SpeciesDatabaseModal } from './components/SpeciesDatabaseModal';
+import { PlanetaryScannerModal } from './components/PlanetaryScannerModal';
 import { getObjectDetails } from './data/celestialObjectDatabase';
 import { STAR_TREK_SOLAR_SYSTEMS } from './three/solarSystems';
 import { battleThemeManager } from './audio/battleThemeManager';
@@ -85,6 +86,7 @@ export default function App() {
   const [activeVoiceText, setActiveVoiceText] = useState<string>('');
   const [isObjectDetailModalOpen, setIsObjectDetailModalOpen] = useState<boolean>(false);
   const [isSpeciesDbOpen, setIsSpeciesDbOpen] = useState<boolean>(false);
+  const [isPlanetaryScannerOpen, setIsPlanetaryScannerOpen] = useState<boolean>(false);
 
   // Compute selected object detailed astrometric dossier automatically
   const selectedObjectInfo = useMemo(() => {
@@ -199,8 +201,6 @@ export default function App() {
         setIsLogConsoleOpen((prev) => !prev);
       } else if (e.key === 'r' || e.key === 'R') {
         setIsRadarScannerOpen((prev) => !prev);
-      } else if (e.key === 'g' || e.key === 'G') {
-        engineRef.current?.cycleAlertLevel();
       } else if (e.key === 'm' || e.key === 'M') {
         setIsMapModalOpen((prev) => !prev);
       } else if (e.key === 'n' || e.key === 'N') {
@@ -396,6 +396,7 @@ export default function App() {
       <LCARSHeader
         shipState={shipState}
         onSetAlert={handleSetAlert}
+        onGAlertAction={() => engineRef.current?.handleGAlertAction()}
         onToggleInspection={() => setIsInspectionOpen((prev) => !prev)}
         onToggleScanner={() => setIsScannerOpen((prev) => !prev)}
         onToggleHelp={() => setIsHelpOpen((prev) => !prev)}
@@ -406,6 +407,7 @@ export default function App() {
         onOpenVoiceSettings={() => setIsVoiceSettingsOpen(true)}
         onToggleComputerVoice={handleToggleComputerVoice}
         onToggleSpeciesDb={() => setIsSpeciesDbOpen((prev) => !prev)}
+        onOpenPlanetaryScanner={() => setIsPlanetaryScannerOpen(true)}
         isComputerVoiceEnabled={isComputerVoiceEnabled}
         isInspectionOpen={isInspectionOpen}
         isScannerOpen={isScannerOpen}
@@ -580,6 +582,23 @@ export default function App() {
         onClearLogs={() => setLogs([])}
         isDocked={isLogDocked}
         onToggleDock={() => setIsLogDocked((prev) => !prev)}
+      />
+
+      
+
+      {/* Planetary Spectroscopy & Habitability Sensor Laboratory Modal */}
+      <PlanetaryScannerModal
+        isOpen={isPlanetaryScannerOpen}
+        onClose={() => setIsPlanetaryScannerOpen(false)}
+        targetPlanetId={shipState?.selectedTargetId || 'sol_saturn'}
+        targetPlanetName={selectedObjectInfo?.name || 'Saturn (Sol VI)'}
+        systemName={selectedObjectInfo?.systemName || 'Sol System'}
+        objectType={selectedObjectInfo?.visual?.badgeLabel?.toLowerCase() || 'planet'}
+        onPlotCourseToTarget={() => {
+          if (shipState?.selectedTargetId) {
+            handleQuickPlotCourse(shipState.selectedTargetId);
+          }
+        }}
       />
 
       {/* Astrometric Object Dossier & Know More Detailed Modal */}

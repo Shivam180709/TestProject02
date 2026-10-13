@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { AlertLevel, ShipState } from '../types/simulation';
 import { soundEffects } from '../audio/soundEffects';
 import { computerVoice } from '../audio/computerVoice';
-import { Shield, AlertTriangle, Volume2, VolumeX, Eye, HelpCircle, Radio, Crosshair, Music, Sliders, Bot, Dna } from 'lucide-react';
+import { Shield, AlertTriangle, Volume2, VolumeX, Eye, HelpCircle, Radio, Crosshair, Music, Sliders, Bot, Dna, Award, Activity } from 'lucide-react';
 
 interface LCARSHeaderProps {
   shipState: ShipState | null;
   onSetAlert: (level: AlertLevel) => void;
+  onGAlertAction?: () => void;
   onToggleInspection: () => void;
   onToggleScanner: () => void;
   onToggleHelp: () => void;
@@ -18,6 +19,7 @@ interface LCARSHeaderProps {
   onGoToNearestSpaceDock?: () => void;
   onToggleComputerVoice?: () => void;
   onToggleSpeciesDb?: () => void;
+    onOpenPlanetaryScanner?: () => void;
   isComputerVoiceEnabled?: boolean;
   isInspectionOpen: boolean;
   isScannerOpen: boolean;
@@ -31,6 +33,7 @@ interface LCARSHeaderProps {
 export const LCARSHeader: React.FC<LCARSHeaderProps> = ({
   shipState,
   onSetAlert,
+  onGAlertAction,
   onToggleInspection,
   onToggleScanner,
   onToggleHelp,
@@ -42,6 +45,7 @@ export const LCARSHeader: React.FC<LCARSHeaderProps> = ({
   onGoToNearestSpaceDock,
   onToggleComputerVoice,
   onToggleSpeciesDb,
+    onOpenPlanetaryScanner,
   isComputerVoiceEnabled = true,
   isInspectionOpen,
   isScannerOpen,
@@ -145,9 +149,14 @@ export const LCARSHeader: React.FC<LCARSHeaderProps> = ({
             <AlertTriangle className="w-3 h-3" />
             Red
           </button>
-          <span className="hidden lg:inline text-[9px] text-slate-500 font-mono-nums px-1.5 font-bold" title="Press G key on keyboard to cycle alert status">
+          <button
+            type="button"
+            onClick={onGAlertAction}
+            className="hidden lg:inline text-[9px] text-slate-400 hover:text-amber-300 font-mono-nums px-1.5 py-0.5 rounded hover:bg-slate-800 transition-colors font-bold cursor-pointer"
+            title="Press G once for Yellow Alert, double-press G for Red Alert"
+          >
             [G]
-          </span>
+          </button>
         </div>
 
         {/* Quick telemetry indicators */}
@@ -196,6 +205,28 @@ export const LCARSHeader: React.FC<LCARSHeaderProps> = ({
           >
             <Crosshair className="w-3.5 h-3.5" />
             <span className="hidden sm:inline font-trek uppercase tracking-wide">Radar [R]</span>
+          </button>
+        )}
+
+                {/* Starfleet Helm & Operations Help Manual */}
+        <button
+          onClick={onToggleHelp}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold transition-all border bg-gradient-to-r from-amber-500/25 to-yellow-500/25 text-amber-300 border-amber-400 hover:bg-amber-500/40 shadow-sm shadow-amber-500/20 active:scale-95"
+          title="Starfleet Operations & Helm Help Manual (All Controls, Shortcuts, Lore & Systems)"
+        >
+          <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
+          <span className="font-trek uppercase tracking-wide">Help</span>
+        </button>
+
+        {/* Interactive Planetary Spectroscopy Scanner */}
+        {onOpenPlanetaryScanner && (
+          <button
+            onClick={onOpenPlanetaryScanner}
+            className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors border bg-sky-500/15 text-sky-300 border-sky-400/40 hover:bg-sky-500/25"
+            title="Planetary Spectroscopy & Atmospheric Science Scanner"
+          >
+            <Activity className="w-3.5 h-3.5 text-sky-400" />
+            <span className="font-trek uppercase tracking-wide">Spectrometer</span>
           </button>
         )}
 
